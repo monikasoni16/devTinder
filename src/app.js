@@ -4,8 +4,12 @@ const app = express();
 const User = require("./models/user");
 const bcrypt = require("bcrypt");
 const { validateSignupData } = require("./utils/validation");
+const cookieParser = require("cookie-parser");
+const jwt = require("jsonwebtoken");
+const { authUser } = require("./middlewares/auth");
 
 app.use(express.json());
+app.use(cookieParser());
 
 app.get("/user", async (req, res) => {
     try {
@@ -66,14 +70,28 @@ app.post("/login", async (req, res) => {
             throw new Error("Invalid credentials");
         }
 
-        const isPasswordValid = await bcrypt.compare(password, user.password);
+        const isPasswordValid = await user.validatePassword(password);
 
         if (isPasswordValid) {
+            //create JWT token
+            const token = await user.getJwt();
+
+            //Add token to cookie
+            res.cookie("token", token, { expires: new Date(Date.now() + 8 * 3600000) });
             res.send("Login successful");
         } else {
             throw new Error("Invalid credentials");
         }
 
+    } catch (error) {
+        res.status(400).send("Error : " + error.message);
+    }
+})
+
+app.get("/profile", authUser, async (req, res) => {
+    try {
+        const user = req.user;
+        res.send(user);
     } catch (error) {
         res.status(400).send("Error : " + error.message);
     }
